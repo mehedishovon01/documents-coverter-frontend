@@ -1,35 +1,48 @@
-version: '3.8'
-
 services:
-  # Development service
-  frontend-dev:
+  web:
     build:
       context: .
-      target: deps
       dockerfile: Dockerfile
     image: converter/frontend-fastapi:v1.0
     container_name: converter-frontend-fastapi-v1.0
-    command: npm run dev
     ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
-    environment:
-      - NODE_ENV=development
-    env_file:
-      - .env.local
-
-  # Production service
-  frontend-prod:
-    build:
-      context: .
-      target: runner
-    ports:
-      - "3000:3000"
+      - "3000:80"
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
-    env_file:
-      - .env.local
-    restart: unless-stopped 
+
+    # Security enhancements
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+
+    # Writable temporary directories needed for nginx
+    tmpfs:
+      - /var/cache/nginx:uid=101,gid=101
+      - /tmp:uid=101,gid=101
+      - /var/run:uid=101,gid=101
+
+    # Healthcheck configuration
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Define volume mount
+    volumes:
+      - volume-converter-frontend-fastapi:/var/log/nginx
+
+# Declare the named volume globally
+volumes:
+  volume-converter-frontend-fastapi:
+    name: volume-converter-frontend-fastapi
+    driver: local
